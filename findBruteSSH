@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# Extract fail2ban log entries for repeatedly banned ssh clients.
+
+set -e
+
+error() {
+  local msg="$1"
+  echo "ERROR: ${msg}" >&2
+  exit ${E_DID_NOTHING}
+}
+
+usage() {
+  echo "usage: $0 [-v] [-n num] [-r regex] [-f logfile] [-h]"
+  echo "          -h          this message"
+  echo "          -u          update existing ip.blacklist"
+  echo "          -n num      require at least num hits of regex"
+  echo "          -n regex    a regex to match against"
+  echo "          -f logfile  the logfile to be parsed"
+  exit
+}
+
+main() {
+  local numFailed='10'
+  local logFile='/var/log/messages'
+  local update='false'
+  local regex='fail2ban\.actions\s+\[[0-9]+\]:\s+NOTICE\s+\[sshd\]\s+'
+  regex+='Unban\s+[0-9]{1,3}[\.][0-9]{1,3}[\.][0-9]{1,3}[\.][0-9]{1,3}'
+
+  while getopts "hun:f:" opt; do
+    case ${opt} in
+      h) usage ;;
+      u) update='true' ;;
+      n) numFailed="${OPTARG}" ;;
+      r) regex="${OPTARG}" ;;
+      f) logFile="${OPTARG}" ;;
+      *) error "Unexpected option ${opt}" ;;
+    esac
+  done 
+
+
+  if [[ ! -f $logFile ]] ; then
+    error "Unable to find logfile (${logFile})."
+    exit ${E_DID_NOTHING}
+  fi
+ 
+  matchedIPs=$(grep -E "${regex}" "${logFile}" \
+    | awk '{print $NF}' \
+    | sort -n \
+    | uniq -c \
+    | sort -n \
+    | awk -v numFailed=${numFailed} '$1 > numFailed {print $2}')
+
+  return_codes=(${PIPESTATUS[*]})
+  if [[ "${return_codes[0]}" -ne 0 ]] ; then
+    error "Grep failed."
+  fi
+  if [[ "${return_codes[1]}" -ne 0 ]] ; then
+    error "First awk failed."
+  fi
+  if [[ "${return_codes[2]}" -ne 0 ]] ; then
+    error "First sort failed."
+  fi
+  if [[ "${return_codes[3]}" -ne 0 ]] ; then
+    error "uniq failed."
+  fi
+  if [[ "${return_codes[4]}" -ne 0 ]] ; then
+    error "Second sort failed."
+  fi
+  
+
+  if [[ "${update}" == "true" ]] ; then
+    for ip in ${matchedIPs}; do
+      if ! grep -q "${ip}" "/etc/fail2ban/ip.blacklist" ; then
+	echo "$(date +'%Y-%m-%d %T') Ban ${ip}"
+      fi
+    done
+  else
+    echo "${matchedIPs}" | sort -n 
+  fi
+  # This is ugly, but examine each part of the pipe to find problems
+}
+
+main "$@"
