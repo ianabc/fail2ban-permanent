@@ -3,7 +3,6 @@
 # Extract fail2ban log entries for repeatedly banned ssh clients.
 
 set -e
-
 error() {
   local msg="$1"
   echo "ERROR: ${msg}" >&2
@@ -24,7 +23,7 @@ main() {
   local numFailed='10'
   local logFile='/var/log/messages'
   local update='false'
-  local regex='fail2ban\.actions\s+\[[0-9]+\]:\s+NOTICE\s+\[sshd\]\s+'
+  local regex='fail2ban\.actions\s*\[[0-9]+\]:\s+NOTICE\s+\[ssh-iptables\]\s+'
   regex+='Unban\s+[0-9]{1,3}[\.][0-9]{1,3}[\.][0-9]{1,3}[\.][0-9]{1,3}'
 
   while getopts "hun:f:" opt; do
