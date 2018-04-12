@@ -1,16 +1,25 @@
 # Fail2ban configuration
 
-We're running fail2ban as basic protection against brute force ssh
-attempts. In the default configuration 4 failed attempts within 10
-minutes will result in a 10 minute ban. There is also a manual blacklist
-intented to catch people who are repeatedly unbanned. It lives at
-/etc/fail2ban/ip.blacklist and it is just a list of IP addresses. 
+fail2ban offers basic protection against brute force ssh attempts. In
+the default configuration with the sshd jail enabled on CentOS 4 failed
+attempts within 10 minutes will result in a 10 minute ban. The jail in
+this package extends this configuration to permenantly ban any IP
+address which is repeatedly banned and unbanned (when the ban times
+out). There are two jails defined: blacklist and blacklist-auto, as you
+might guess, they implement the same policy, but blacklist-auto will
+take all actions automatically. The permanent blacklist is populated
+into a file /etc/fail2ban/ip.blacklist and it is just a list of IP
+addresses. 
 
-## Using this blacklist
+Things were mostly written with CentOS (7) in mind, but things seem to
+work fine on debian as well. The main thing to be aware of on other
+systems is the name of the ssh jail. On CentOS, this seems to be sshd
+and on my debian machine it was ssh-iptables. Check and adjust the files
+in filter.d as needed.  ## Using this blacklist
 
 I use this blacklist by cloning out the repository into
-/etc/fail2ban/fail2ban-permanent, then symlinking the jail, action and filter
-files
+/etc/fail2ban/fail2ban-permanent, then symlinking the jail, action and
+filter files
 ```
   $ cd /etc/fail2ban/jail.d
   $ ln -s ../fail2ban-permanent/jail.d/blacklist.conf
@@ -52,9 +61,10 @@ Good candidates for blacklisting can be found by grepping the log files of
 fail2ban. I like to watch the Unban action and if an IP is being repeatedly
 banned and unbanned I'll throw it in the blacklist. Depending on where fail2ban
 is logging and your ssh jail name (ssh-iptables), the following command pipe
-would show you IP addresses banned more than 10 times.
+would show you IP addresses banned more than 10 times (check the jail
+name on non CentOS systems!).
 ```
-grep -E '[ssh-iptables\]\s+Unban' /var/log/fail2ban.log \
+grep -E '[sshd\]\s+Unban' /var/log/fail2ban.log \
   | awk '{print $NF}' \
   | sort -n \
   | uniq -c \
